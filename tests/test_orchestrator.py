@@ -1,6 +1,7 @@
 import pytest
-from unittest.mock import patch, MagicMock
-from hermes.orchestrator import parse_stack_trace, run
+import subprocess
+from unittest.mock import patch, MagicMock, call
+from hermes.orchestrator import parse_stack_trace, run, _commit_workspace_changes
 
 
 SAMPLE_TRACE = """Traceback (most recent call last):
@@ -170,3 +171,29 @@ def test_run_no_changes_skips_pr(
     assert result["pr_url"] is None
     mock_push.assert_not_called()
     mock_pr.assert_not_called()
+
+
+def test_commit_workspace_changes_uses_git_add_u(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "t@t.com"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.name", "T"], cwd=repo, check=True, capture_output=True)
+    tracked = repo / "source.py"
+    tracked.write_text("original")
+    subprocess.run(["git", "add", "source.py"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "init"], cwd=repo, check=True, capture_output=True)
+
+    # Modify tracked file and also drop an untracked secret next to it
+    tracked.write_text("fixed")
+    (repo / ".env").write_text("SECRET=hunter2")
+
+    result = _commit_workspace_changes(str(repo), "hotfix/test-branch")
+
+    assert result is True
+    # Untracked .env must NOT appear in the commit
+    log = subprocess.run(
+        ["git", "show", "--name-only", "--format="], cwd=repo, capture_output=True, text=True
+    )
+    assert "source.py" in log.stdout
+    assert ".env" not in log.stdout

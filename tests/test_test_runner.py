@@ -1,5 +1,5 @@
 import pytest
-from hermes.test_runner import run_tests
+from hermes.test_runner import run_tests, validate_test_command
 
 
 @pytest.fixture
@@ -35,3 +35,41 @@ def test_run_tests_fails_on_red_suite(failing_test_dir):
 def test_run_tests_captures_stdout(failing_test_dir):
     result = run_tests(failing_test_dir)
     assert "AssertionError" in result["stdout"] or "assert 1 == 2" in result["stdout"]
+
+
+# --- validate_test_command tests ---
+
+def test_validate_allows_pytest():
+    validate_test_command("pytest")  # must not raise
+
+
+def test_validate_allows_pytest_with_flags():
+    validate_test_command("pytest -v tests/")  # must not raise
+
+
+def test_validate_allows_python_m_pytest():
+    validate_test_command("python -m pytest")  # must not raise
+
+
+def test_validate_allows_npm_test():
+    validate_test_command("npm test")  # must not raise
+
+
+def test_validate_rejects_arbitrary_command():
+    with pytest.raises(ValueError, match="not permitted"):
+        validate_test_command("rm -rf /")
+
+
+def test_validate_rejects_curl():
+    with pytest.raises(ValueError, match="not permitted"):
+        validate_test_command("curl http://evil.com")
+
+
+def test_validate_rejects_pytest_lookalike():
+    with pytest.raises(ValueError, match="not permitted"):
+        validate_test_command("pytestevil")
+
+
+def test_run_tests_raises_on_blocked_command(passing_test_dir):
+    with pytest.raises(ValueError, match="not permitted"):
+        run_tests(passing_test_dir, test_command="curl http://evil.com")

@@ -59,7 +59,7 @@ def _commit_workspace_changes(repo_dir: str, branch_name: str) -> bool:
         ["git", "checkout", "-b", branch_name],
         cwd=repo_dir, check=True, capture_output=True,
     )
-    subprocess.run(["git", "add", "-A"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(["git", "add", "-u"], cwd=repo_dir, check=True, capture_output=True)
     subprocess.run(
         ["git", "commit", "-m", f"fix: automated patch by Hermes [{branch_name}]"],
         cwd=repo_dir, check=True, capture_output=True,

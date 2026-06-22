@@ -8,12 +8,21 @@ from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv(usecwd=True), override=True)
 
 from hermes.orchestrator import run as orchestrator_run
+from hermes.test_runner import validate_test_command
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%H:%M:%S",
 )
+
+
+def validate_repo_url(url: str) -> None:
+    if not url.startswith("https://github.com/"):
+        raise ValueError(
+            "Hermes only supports public GitHub repositories over HTTPS for security (SSRF protection). "
+            "URL must start with https://github.com/"
+        )
 
 
 def _load_config() -> dict:
@@ -64,10 +73,20 @@ def fix(error, error_file, repo, base_branch, test_command, max_attempts):
     if not error and not error_file:
         raise click.UsageError("Provide either --error or --error-file")
 
+    try:
+        validate_repo_url(repo)
+    except ValueError as e:
+        raise click.UsageError(str(e))
+
     config = _load_config()
     effective_test_command = test_command or config.get("default_test_command", "pytest")
     effective_max_attempts = max_attempts or config.get("max_fix_attempts", 3)
     effective_workspace_base = config.get("workspace_base") or None
+
+    try:
+        validate_test_command(effective_test_command)
+    except ValueError as e:
+        raise click.UsageError(str(e))
 
     stack_trace = _parse_sentry_json(error_file) if error_file else error
     click.echo("Hermes is analyzing the error...")
