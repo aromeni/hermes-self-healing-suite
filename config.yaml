@@ -1,0 +1,13 @@
+default_test_command: "pytest"
+max_fix_attempts: 3
+workspace_base: "/tmp"
+
+github:
+  token_env_var: "GITHUB_TOKEN"
+
+target_repo:
+  url: ""
+  default_branch: "main"
+
+logging:
+  level: "INFO"
