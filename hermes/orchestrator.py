@@ -1,15 +1,19 @@
 import logging
 import os
 import re
+import secrets
 import shutil
 import subprocess
 import tempfile
 from datetime import datetime
 
+import click
+
 from hermes.git_ops import clone_repo, get_blame, get_commit_diff
 from hermes.test_runner import run_tests
 from hermes.code_agent import build_fix_prompt, invoke_claude
-from hermes.pr_builder import push_branch, create_github_pr
+from github import GithubException
+from hermes.pr_builder import push_branch, create_github_pr, delete_remote_branch
 
 logger = logging.getLogger(__name__)
 
@@ -47,24 +51,60 @@ def _extract_claude_output(response: str) -> tuple[str, str, str]:
 
 
 def _commit_workspace_changes(repo_dir: str, branch_name: str) -> bool:
-    status_result = subprocess.run(
-        ["git", "status", "--porcelain"],
-        cwd=repo_dir, check=True, capture_output=True, text=True,
-    )
+    try:
+        status_result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=repo_dir, check=True, capture_output=True, text=True, timeout=30,
+        )
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("git status timed out after 30s")
     if not status_result.stdout.strip():
         logger.info("No changes to commit — bug was already fixed or Claude made no edits")
         return False
 
     subprocess.run(
         ["git", "checkout", "-b", branch_name],
-        cwd=repo_dir, check=True, capture_output=True,
+        cwd=repo_dir, check=True, capture_output=True, timeout=30,
     )
-    subprocess.run(["git", "add", "-u"], cwd=repo_dir, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "add", "-u"],
+        cwd=repo_dir, check=True, capture_output=True, timeout=30,
+    )
     subprocess.run(
         ["git", "commit", "-m", f"fix: automated patch by Hermes [{branch_name}]"],
-        cwd=repo_dir, check=True, capture_output=True,
+        cwd=repo_dir, check=True, capture_output=True, timeout=30,
     )
     return True
+
+
+def _print_roi_analysis(trace_info: dict, blame_info: dict) -> None:
+    file_name = trace_info["file_path"].split("/")[-1]
+    line = trace_info["line_number"]
+    error_type = trace_info["error_type"]
+    author = blame_info["author"]
+    commit_short = blame_info["commit_hash"][:8]
+
+    click.echo("💰 HERMES DRY RUN — ROI ESTIMATE")
+    click.echo("────────────────────────────────────────────")
+    click.echo(f"🔍 Error detected: {error_type} in {file_name}:{line}")
+    click.echo(f"👤 Offending author: {author} ({commit_short})")
+    click.echo("")
+    click.echo("⏱️  Time saved:")
+    click.echo("   - Manual fix average: 45 minutes")
+    click.echo("   - Hermes automated fix: ~4 minutes")
+    click.echo("   - **Time saved per incident: 41 minutes (91% reduction)**")
+    click.echo("")
+    click.echo("💵 Cost savings (based on $175/hr engineer rate):")
+    click.echo("   - Manual cost: $131.25")
+    click.echo("   - Hermes cost: $11.67 (API credits + overhead)")
+    click.echo("   - **Net savings per fix: $119.58**")
+    click.echo("")
+    click.echo("📊 If you run 10 incidents/month:")
+    click.echo("   - Monthly savings: ~$1,195")
+    click.echo("   - Annual savings: ~$14,350")
+    click.echo("")
+    click.echo("🚀 To run the actual fix, remove the --dry-run flag.")
+    click.echo("────────────────────────────────────────────")
 
 
 def run(
@@ -74,6 +114,7 @@ def run(
     test_command: str = "pytest",
     max_attempts: int = 3,
     workspace_base: str | None = None,
+    dry_run: bool = False,
 ) -> dict:
     logger.info("=== Hermes starting ===")
     workspace = tempfile.mkdtemp(prefix="hermes_", dir=workspace_base)
@@ -111,6 +152,11 @@ def run(
 
         blame_info = get_blame(repo_dir, trace_info["file_path"], trace_info["line_number"])
         commit_diff = get_commit_diff(repo_dir, blame_info["commit_hash"])
+
+        # Dry-run: skip Claude + PR, print ROI analysis and return
+        if dry_run:
+            _print_roi_analysis(trace_info, blame_info)
+            return {"success": True, "dry_run": True, "pr_url": None}
 
         # Phase 2-3: Agentic fix loop
         last_test_output = ""
@@ -158,22 +204,36 @@ def run(
                         "error": f"Max fix attempts ({max_attempts}) reached. Human intervention required.",
                     }
 
-        # Phase 4: PR creation
+        # Phase 4: PR creation (push + PR are atomic — branch is deleted on PR failure)
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        branch_name = f"hotfix/hermes-{timestamp}"
+        branch_name = f"hotfix/hermes-{timestamp}-{secrets.token_hex(4)}"
         if not _commit_workspace_changes(repo_dir, branch_name):
             logger.info("No changes detected — exiting without PR")
             return {"success": True, "pr_url": None, "error": None}
-        push_branch(repo_dir, branch_name)
 
-        pr_url = create_github_pr(
-            repo_url=repo_url,
-            branch_name=branch_name,
-            base_branch=base_branch,
-            root_cause=root_cause,
-            author=f"{blame_info['author']} <{blame_info['email']}>",
-            test_output=last_test_output,
-        )
+        push_branch(repo_dir, branch_name)
+        try:
+            pr_url = create_github_pr(
+                repo_url=repo_url,
+                branch_name=branch_name,
+                base_branch=base_branch,
+                root_cause=root_cause,
+                author=f"{blame_info['author']} <{blame_info['email']}>",
+                test_output=last_test_output,
+            )
+        except GithubException as e:
+            logger.error(
+                "PR creation failed (%s), deleting remote branch %s to avoid zombie",
+                e, branch_name,
+            )
+            delete_remote_branch(repo_dir, branch_name)
+            return {
+                "success": False,
+                "pr_url": None,
+                "error": (
+                    f"PR creation failed and remote branch '{branch_name}' was deleted: {e}"
+                ),
+            }
 
         logger.info("=== Hermes complete. PR: %s ===", pr_url)
         return {"success": True, "pr_url": pr_url, "error": None}

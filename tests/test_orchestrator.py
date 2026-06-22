@@ -1,6 +1,7 @@
 import pytest
 import subprocess
 from unittest.mock import patch, MagicMock, call
+from github import GithubException
 from hermes.orchestrator import parse_stack_trace, run, _commit_workspace_changes
 
 
@@ -197,3 +198,126 @@ def test_commit_workspace_changes_uses_git_add_u(tmp_path):
     )
     assert "source.py" in log.stdout
     assert ".env" not in log.stdout
+
+
+@patch("hermes.orchestrator.delete_remote_branch")
+@patch("hermes.orchestrator.create_github_pr")
+@patch("hermes.orchestrator.push_branch")
+@patch("hermes.orchestrator._commit_workspace_changes")
+@patch("hermes.orchestrator.invoke_claude")
+@patch("hermes.orchestrator.run_tests")
+@patch("hermes.orchestrator.get_commit_diff")
+@patch("hermes.orchestrator.get_blame")
+@patch("hermes.orchestrator.clone_repo")
+@patch("hermes.orchestrator.tempfile.mkdtemp")
+@patch("hermes.orchestrator.os.path.exists", return_value=True)
+def test_pr_failure_deletes_remote_branch(
+    mock_exists, mock_mkdtemp, mock_clone, mock_blame, mock_diff,
+    mock_tests, mock_claude, mock_commit, mock_push, mock_pr, mock_delete,
+):
+    mock_mkdtemp.return_value = "/tmp/hermes_test"
+    mock_clone.return_value = "/tmp/hermes_test/repo"
+    mock_blame.return_value = {
+        "commit_hash": "a" * 40,
+        "author": "Dev", "email": "dev@co.com", "summary": "fix",
+    }
+    mock_diff.return_value = "diff content"
+    mock_claude.return_value = (
+        "HERMES_STATUS: FIXED\nHERMES_ROOT_CAUSE: Found it\nHERMES_TEST_RESULT: 1 passed"
+    )
+    mock_tests.return_value = {"passed": True, "stdout": "1 passed", "stderr": "", "exit_code": 0}
+    mock_commit.return_value = True
+    mock_pr.side_effect = GithubException(403, {"message": "Forbidden"}, None)
+
+    result = run(
+        stack_trace=SAMPLE_TRACE,
+        repo_url="https://github.com/org/repo.git",
+        base_branch="main",
+        test_command="pytest",
+        max_attempts=3,
+    )
+
+    assert result["success"] is False
+    assert "deleted" in result["error"]
+    mock_push.assert_called_once()
+    mock_delete.assert_called_once()
+
+
+@patch("hermes.orchestrator.invoke_claude")
+@patch("hermes.orchestrator.get_commit_diff")
+@patch("hermes.orchestrator.get_blame")
+@patch("hermes.orchestrator.clone_repo")
+@patch("hermes.orchestrator.tempfile.mkdtemp")
+@patch("hermes.orchestrator.os.path.exists", return_value=True)
+def test_dry_run_returns_roi_result_without_calling_claude(
+    mock_exists, mock_mkdtemp, mock_clone, mock_blame, mock_diff, mock_claude, tmp_path
+):
+    mock_mkdtemp.return_value = str(tmp_path)
+    cloned = tmp_path / "repo"
+    cloned.mkdir()
+    mock_clone.return_value = str(cloned)
+    mock_blame.return_value = {
+        "commit_hash": "5aea70b2",
+        "author": "Rashid",
+        "email": "rashid@example.com",
+        "summary": "init",
+    }
+    mock_diff.return_value = "diff content"
+
+    trace = 'File "buggy_math.py", line 2, in add\nAssertionError: expected 3, got -1'
+    result = run(
+        stack_trace=trace,
+        repo_url="https://github.com/org/repo.git",
+        base_branch="main",
+        test_command="pytest",
+        max_attempts=3,
+        dry_run=True,
+    )
+
+    assert result == {"success": True, "dry_run": True, "pr_url": None}
+    mock_claude.assert_not_called()
+
+
+@patch("hermes.orchestrator.create_github_pr")
+@patch("hermes.orchestrator.push_branch")
+@patch("hermes.orchestrator._commit_workspace_changes")
+@patch("hermes.orchestrator.invoke_claude")
+@patch("hermes.orchestrator.run_tests")
+@patch("hermes.orchestrator.get_commit_diff")
+@patch("hermes.orchestrator.get_blame")
+@patch("hermes.orchestrator.clone_repo")
+@patch("hermes.orchestrator.tempfile.mkdtemp")
+@patch("hermes.orchestrator.os.path.exists", return_value=True)
+def test_branch_names_are_unique(
+    mock_exists, mock_mkdtemp, mock_clone, mock_blame, mock_diff,
+    mock_tests, mock_claude, mock_commit, mock_push, mock_pr,
+):
+    mock_mkdtemp.return_value = "/tmp/hermes_test"
+    mock_clone.return_value = "/tmp/hermes_test/repo"
+    mock_blame.return_value = {
+        "commit_hash": "a" * 40,
+        "author": "Dev", "email": "dev@co.com", "summary": "fix",
+    }
+    mock_diff.return_value = "diff content"
+    mock_claude.return_value = (
+        "HERMES_STATUS: FIXED\nHERMES_ROOT_CAUSE: Found it\nHERMES_TEST_RESULT: 1 passed"
+    )
+    mock_tests.return_value = {"passed": True, "stdout": "1 passed", "stderr": "", "exit_code": 0}
+    mock_commit.return_value = True
+    mock_pr.return_value = "https://github.com/org/repo/pull/1"
+
+    kwargs = dict(
+        stack_trace=SAMPLE_TRACE,
+        repo_url="https://github.com/org/repo.git",
+        base_branch="main",
+        test_command="pytest",
+        max_attempts=3,
+    )
+    run(**kwargs)
+    run(**kwargs)
+
+    branch_names = [call_args[0][1] for call_args in mock_commit.call_args_list]
+    assert branch_names[0] != branch_names[1]
+    import re as _re
+    for name in branch_names:
+        assert _re.match(r"hotfix/hermes-\d{8}-\d{6}-[0-9a-f]{8}$", name), name

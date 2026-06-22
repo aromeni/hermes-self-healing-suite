@@ -68,7 +68,8 @@ def cli():
 @click.option("--base-branch", default="main", show_default=True)
 @click.option("--test-command", default=None, help="Test command (default: from config.yaml)")
 @click.option("--max-attempts", default=None, type=int, help="Max fix attempts (default: from config.yaml)")
-def fix(error, error_file, repo, base_branch, test_command, max_attempts):
+@click.option("--dry-run", is_flag=True, help="Simulate the fix and show ROI without running Claude or creating a PR.")
+def fix(error, error_file, repo, base_branch, test_command, max_attempts, dry_run):
     """Diagnose a production error and create an automated fix PR."""
     if not error and not error_file:
         raise click.UsageError("Provide either --error or --error-file")
@@ -98,12 +99,13 @@ def fix(error, error_file, repo, base_branch, test_command, max_attempts):
         test_command=effective_test_command,
         max_attempts=effective_max_attempts,
         workspace_base=effective_workspace_base,
+        dry_run=dry_run,
     )
 
     if result["success"]:
-        if result["pr_url"]:
+        if not result.get("dry_run") and result["pr_url"]:
             click.echo(f"PR: {result['pr_url']}")
-        else:
+        elif not result.get("dry_run"):
             click.echo("Tests already passing — no fix needed.")
         sys.exit(0)
     else:

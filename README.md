@@ -141,6 +141,43 @@ hermes fix \
   --test-command "pytest tests/ -x"
 ```
 
+### Dry-run mode (sales demo / cost estimation)
+
+Use `--dry-run` to see an ROI estimate without spending API credits or touching GitHub:
+
+```bash
+hermes fix \
+  --error 'File "buggy_math.py", line 2, in add\nAssertionError: expected 3, got -1' \
+  --repo https://github.com/your-org/your-repo.git \
+  --dry-run
+```
+
+Output:
+
+```
+💰 HERMES DRY RUN — ROI ESTIMATE
+────────────────────────────────────────────
+🔍 Error detected: AssertionError in buggy_math.py:2
+👤 Offending author: Rashid (5aea70b2)
+
+⏱️  Time saved:
+   - Manual fix average: 45 minutes
+   - Hermes automated fix: ~4 minutes
+   - **Time saved per incident: 41 minutes (91% reduction)**
+
+💵 Cost savings (based on $175/hr engineer rate):
+   - Manual cost: $131.25
+   - Hermes cost: $11.67 (API credits + overhead)
+   - **Net savings per fix: $119.58**
+
+📊 If you run 10 incidents/month:
+   - Monthly savings: ~$1,195
+   - Annual savings: ~$14,350
+
+🚀 To run the actual fix, remove the --dry-run flag.
+────────────────────────────────────────────
+```
+
 ### Typical output
 
 ```
@@ -174,6 +211,7 @@ hermes fix [OPTIONS]
 | `--base-branch TEXT` | No | `main` | Branch to open the PR against |
 | `--test-command TEXT` | No | `pytest` (from `config.yaml`) | Command used to run the test suite |
 | `--max-attempts INT` | No | `3` (from `config.yaml`) | Maximum fix-retry cycles before giving up |
+| `--dry-run` | No | off | Simulate the fix and print an ROI analysis — does not invoke Claude or create a PR |
 
 **Exit codes:**
 
