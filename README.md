@@ -73,7 +73,7 @@ If Claude fixes the bug on the first attempt and tests pass, the entire pipeline
 Clone this repository and install in editable mode:
 
 ```bash
-git clone https://github.com/your-org/hermes-self-healing.git
+git clone https://github.com/your-org/hermes-self-healing-suite.git
 cd hermes-self-healing
 pip install -e .
 ```
