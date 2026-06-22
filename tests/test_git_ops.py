@@ -1,6 +1,7 @@
 import os
 import subprocess
 import pytest
+from unittest.mock import patch
 from hermes.git_ops import clone_repo, get_blame, get_commit_diff
 
 
@@ -37,3 +38,23 @@ def test_get_commit_diff_returns_diff_string(local_git_repo):
     diff = get_commit_diff(local_git_repo, blame["commit_hash"])
     assert "def add" in diff
     assert "return a - b" in diff
+
+
+# --- Timeout tests ---
+
+def test_clone_repo_raises_on_timeout():
+    with patch("subprocess.run", side_effect=subprocess.TimeoutExpired(["git", "clone"], 120)):
+        with pytest.raises(RuntimeError, match="timed out"):
+            clone_repo("https://github.com/org/repo.git", "/tmp/dest")
+
+
+def test_get_blame_raises_on_timeout(local_git_repo):
+    with patch("subprocess.run", side_effect=subprocess.TimeoutExpired(["git", "blame"], 120)):
+        with pytest.raises(RuntimeError, match="timed out"):
+            get_blame(local_git_repo, "math.py", 4)
+
+
+def test_get_commit_diff_raises_on_timeout(local_git_repo):
+    with patch("subprocess.run", side_effect=subprocess.TimeoutExpired(["git", "log"], 120)):
+        with pytest.raises(RuntimeError, match="timed out"):
+            get_commit_diff(local_git_repo, "a" * 40)

@@ -48,15 +48,30 @@ def _build_pr_body(root_cause: str, author: str, test_output: str) -> str:
 
 def push_branch(repo_dir: str, branch_name: str) -> None:
     logger.info("Pushing branch %s", branch_name)
-    result = subprocess.run(
-        ["git", "push", "origin", branch_name],
-        cwd=repo_dir,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            ["git", "push", "origin", branch_name],
+            cwd=repo_dir,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("git push timed out after 120s")
     if result.returncode != 0:
         raise RuntimeError(f"git push failed:\n{result.stderr}")
     logger.info("Branch pushed successfully")
+
+
+def delete_remote_branch(repo_dir: str, branch_name: str) -> None:
+    logger.info("Deleting remote branch %s", branch_name)
+    subprocess.run(
+        ["git", "push", "origin", "--delete", branch_name],
+        cwd=repo_dir,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
 
 
 def create_github_pr(
