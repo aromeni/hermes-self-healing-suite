@@ -65,13 +65,15 @@ def push_branch(repo_dir: str, branch_name: str) -> None:
 
 def delete_remote_branch(repo_dir: str, branch_name: str) -> None:
     logger.info("Deleting remote branch %s", branch_name)
-    subprocess.run(
+    result = subprocess.run(
         ["git", "push", "origin", "--delete", branch_name],
         cwd=repo_dir,
         capture_output=True,
         text=True,
         timeout=30,
     )
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to delete remote branch '{branch_name}':\n{result.stderr}")
 
 
 def create_github_pr(

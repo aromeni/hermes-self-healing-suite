@@ -221,19 +221,13 @@ def run(
                 author=f"{blame_info['author']} <{blame_info['email']}>",
                 test_output=last_test_output,
             )
-        except GithubException as e:
+        except Exception as e:
             logger.error(
-                "PR creation failed (%s), deleting remote branch %s to avoid zombie",
-                e, branch_name,
+                "PR creation failed (%s: %s), deleting remote branch %s to avoid zombie",
+                type(e).__name__, e, branch_name,
             )
             delete_remote_branch(repo_dir, branch_name)
-            return {
-                "success": False,
-                "pr_url": None,
-                "error": (
-                    f"PR creation failed and remote branch '{branch_name}' was deleted: {e}"
-                ),
-            }
+            raise
 
         logger.info("=== Hermes complete. PR: %s ===", pr_url)
         return {"success": True, "pr_url": pr_url, "error": None}

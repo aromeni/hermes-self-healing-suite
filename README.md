@@ -63,7 +63,7 @@ If Claude fixes the bug on the first attempt and tests pass, the entire pipeline
 | Python 3.10+                              |                                                                     |
 | [Claude Code CLI](https://claude.ai/code) | Must be on `PATH` as `claude`                                       |
 | Git                                       | Must be on `PATH`                                                   |
-| GitHub personal access token              | Needs**Contents: Read & write** and **Pull requests: Read & write** |
+| GitHub personal access token              | Needs **Contents: Read & write** and **Pull requests: Read & write** |
 | Anthropic API key                         | Used automatically by the Claude Code CLI                           |
 
 ---
@@ -191,8 +191,8 @@ Hermes is analyzing the error...
 20:10:10 [INFO] hermes.orchestrator: Claude status: FIXED
 20:10:12 [INFO] hermes.test_runner: Test result: PASS (exit code 0)
 20:10:13 [INFO] hermes.pr_builder: Branch pushed successfully
-20:10:14 [INFO] hermes.pr_builder: PR created: https://github.com/your-org/your-repo/pull/42
-PR: https://github.com/your-org/your-repo/pull/42
+20:10:14 [INFO] hermes.pr_builder: PR created: https://github.com/aromeni/hermes-self-healing-suite/pull/42
+PR: https://github.com/aromeni/hermes-self-healing-suite/pull/42
 ```
 
 ---
@@ -236,9 +236,9 @@ hermes fix [OPTIONS]
 
 Hermes is built with enterprise security as a first-class concern:
 
-- **SSRF Protection:** Repository URLs are strictly validated against `https://github.com/` to prevent path traversal or internal network access.
+- **SSRF Protection:** Repository URLs are validated at the CLI entry point against `https://github.com/` to prevent internal network access. Only HTTPS GitHub URLs are accepted.
 - **Secret Leakage Prevention:** `git add -u` stages only tracked files—untracked `.env` files, build artifacts, and secrets are never accidentally committed.
-- **Command Allowlisting:** The test command is restricted to a curated list (`pytest`, `npm test`, `jest`, `go test`, `cargo test`) to prevent arbitrary code execution.
+- **Command Allowlisting:** The test command is restricted to a curated list (`pytest`, `python -m pytest`, `npm test`, `jest`, `go test`, `cargo test`) to prevent arbitrary code execution.
 - **Atomic Rollback:** If PR creation fails, the remote branch is automatically deleted—no orphaned branches left behind.
 
 ### Module overview

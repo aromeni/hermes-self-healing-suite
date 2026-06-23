@@ -229,16 +229,15 @@ def test_pr_failure_deletes_remote_branch(
     mock_commit.return_value = True
     mock_pr.side_effect = GithubException(403, {"message": "Forbidden"}, None)
 
-    result = run(
-        stack_trace=SAMPLE_TRACE,
-        repo_url="https://github.com/org/repo.git",
-        base_branch="main",
-        test_command="pytest",
-        max_attempts=3,
-    )
+    with pytest.raises(GithubException):
+        run(
+            stack_trace=SAMPLE_TRACE,
+            repo_url="https://github.com/org/repo.git",
+            base_branch="main",
+            test_command="pytest",
+            max_attempts=3,
+        )
 
-    assert result["success"] is False
-    assert "deleted" in result["error"]
     mock_push.assert_called_once()
     mock_delete.assert_called_once()
 
