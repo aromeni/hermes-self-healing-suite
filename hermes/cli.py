@@ -92,15 +92,20 @@ def fix(error, error_file, repo, base_branch, test_command, max_attempts, dry_ru
     stack_trace = _parse_sentry_json(error_file) if error_file else error
     click.echo("Hermes is analyzing the error...")
 
-    result = orchestrator_run(
-        stack_trace=stack_trace,
-        repo_url=repo,
-        base_branch=base_branch,
-        test_command=effective_test_command,
-        max_attempts=effective_max_attempts,
-        workspace_base=effective_workspace_base,
-        dry_run=dry_run,
-    )
+    try:
+        result = orchestrator_run(
+            stack_trace=stack_trace,
+            repo_url=repo,
+            base_branch=base_branch,
+            test_command=effective_test_command,
+            max_attempts=effective_max_attempts,
+            workspace_base=effective_workspace_base,
+            dry_run=dry_run,
+        )
+    except Exception as e:
+        click.echo(f"❌ Hermes encountered an error: {e}", err=True)
+        click.echo("   (The workspace has been cleaned up and any partial branches were rolled back.)", err=True)
+        raise SystemExit(1)
 
     if result["success"]:
         if not result.get("dry_run") and result["pr_url"]:

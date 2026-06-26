@@ -65,8 +65,8 @@ If Claude fixes the bug on the first attempt and tests pass, the entire pipeline
 | Requirement                            | Notes                                                                           |
 | -------------------------------------- | ------------------------------------------------------------------------------- |
 | Python 3.10+                           |                                                                                 |
-| [Claude Code CLI](https://claude.ai/code) | Must be on `PATH` as `claude`                                               |
-| Git                                    | Must be on `PATH`                                                             |
+| [Claude Code CLI](https://claude.ai/code) | Must be on`PATH` as `claude`                                                |
+| Git                                    | Must be on`PATH`                                                              |
 | GitHub personal access token           | Needs**Contents: Read & write** and **Pull requests: Read & write** |
 | Anthropic API key                      | Used automatically by the Claude Code CLI                                       |
 
@@ -161,26 +161,26 @@ hermes fix \
 Output:
 
 ```
-💰 HERMES DRY RUN — ROI ESTIMATE
+ HERMES DRY RUN — ROI ESTIMATE
 ────────────────────────────────────────────
-🔍 Error detected: AssertionError in buggy_math.py:2
-👤 Offending author: Rashid (5aea70b2)
+ Error detected: AssertionError in buggy_math.py:2
+ Offending author: Rashid (5aea70b2)
 
-⏱️  Time saved:
+ Time saved:
    - Manual fix average: 45 minutes
    - Hermes automated fix: ~4 minutes
    - Time saved per incident: 41 minutes (91% reduction)
 
-💵 Cost savings (based on $175/hr engineer rate):
+ Cost savings (based on $175/hr engineer rate):
    - Manual cost: $131.25
    - Hermes cost: $11.67 (API credits + overhead)
    - Net savings per fix: $119.58
 
-📊 If you run 10 incidents/month:
+ If you run 10 incidents/month:
    - Monthly savings: ~$1,195
    - Annual savings: ~$14,350
 
-🚀 To run the actual fix, remove the --dry-run flag.
+ To run the actual fix, remove the --dry-run flag.
 ────────────────────────────────────────────
 ```
 
@@ -209,15 +209,15 @@ PR: https://github.com/aromeni/hermes-self-healing-suite/pull/42
 hermes fix [OPTIONS]
 ```
 
-| Option                  | Required                               | Default                           | Description                                                                         |
-| ----------------------- | -------------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------- |
-| `--error TEXT`        | One of `--error` or `--error-file` | —                                | Raw stack trace string                                                              |
-| `--error-file PATH`   | One of `--error` or `--error-file` | —                                | Path to a Sentry JSON event file                                                    |
-| `--repo URL`          | Yes                                    | —                                | Target repository URL (`https://` or `git@`)                                    |
-| `--base-branch TEXT`  | No                                     | `main`                          | Branch to open the PR against                                                       |
-| `--test-command TEXT` | No                                     | `pytest` (from `config.yaml`) | Command used to run the test suite                                                  |
-| `--max-attempts INT`  | No                                     | `3` (from `config.yaml`)      | Maximum fix-retry cycles before giving up                                           |
-| `--dry-run`           | No                                     | off                               | Simulate the fix and print an ROI analysis — does not invoke Claude or create a PR |
+| Option                  | Required                              | Default                           | Description                                                                         |
+| ----------------------- | ------------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------- |
+| `--error TEXT`        | One of`--error` or `--error-file` | —                                | Raw stack trace string                                                              |
+| `--error-file PATH`   | One of`--error` or `--error-file` | —                                | Path to a Sentry JSON event file                                                    |
+| `--repo URL`          | Yes                                   | —                                | Target repository URL (`https://` or `git@`)                                    |
+| `--base-branch TEXT`  | No                                    | `main`                          | Branch to open the PR against                                                       |
+| `--test-command TEXT` | No                                    | `pytest` (from `config.yaml`) | Command used to run the test suite                                                  |
+| `--max-attempts INT`  | No                                    | `3` (from `config.yaml`)      | Maximum fix-retry cycles before giving up                                           |
+| `--dry-run`           | No                                    | off                               | Simulate the fix and print an ROI analysis — does not invoke Claude or create a PR |
 
 **Exit codes:**
 
@@ -234,7 +234,7 @@ hermes fix [OPTIONS]
 | ----- | ------------------- | ------------------------------------------------------------ |
 | 0     | `orchestrator.py` | Parse stack trace, create temp workspace, clone repo         |
 | 1     | `git_ops.py`      | `git blame -p` on offending line, `git log -p` on commit |
-| 2     | `code_agent.py`   | Build structured prompt, invoke `claude -p` subprocess     |
+| 2     | `code_agent.py`   | Build structured prompt, invoke`claude -p` subprocess      |
 | 3     | `test_runner.py`  | Run test command, capture stdout/stderr/exit code            |
 | 4     | `pr_builder.py`   | Commit changes, push branch, create PR via PyGithub          |
 
