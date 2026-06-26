@@ -1,9 +1,11 @@
 # Hermes — Autonomous Self-Healing Production Debugger
 
-Hermes is a CLI tool that closes the loop between a production error and a merged fix — automatically. Feed it a stack trace, point it at a repository, and it clones the repo, pinpoints the offending commit via `git blame`, invokes Claude Code as an autonomous SRE agent to diagnose and patch the bug, validates the fix against your test suite, and opens a reviewed GitHub pull request. Zero human intervention required after the initial trigger.
+![Tests](https://img.shields.io/badge/tests-47%2F47-brightgreen)
+![License](https://img.shields.io/badge/License-AGPLv3-blue)
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
+![Claude Code](https://img.shields.io/badge/Claude%20Code-powered-purple)
 
-![Python](https://img.shields.io/badge/python-3.10+-blue)
-![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)
+Hermes is a CLI tool that closes the loop between a production error and a merged fix — automatically. Feed it a stack trace, point it at a repository, and it clones the repo, pinpoints the offending commit via `git blame`, invokes Claude Code as an autonomous SRE agent to diagnose and patch the bug, validates the fix against your test suite, and opens a reviewed GitHub pull request. Zero human intervention required after the initial trigger.
 
 ```
 Production alert  ──►  hermes fix  ──►  PR opened  ──►  Human reviews & merges
