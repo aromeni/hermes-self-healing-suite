@@ -2,6 +2,9 @@
 
 Hermes is a CLI tool that closes the loop between a production error and a merged fix — automatically. Feed it a stack trace, point it at a repository, and it clones the repo, pinpoints the offending commit via `git blame`, invokes Claude Code as an autonomous SRE agent to diagnose and patch the bug, validates the fix against your test suite, and opens a reviewed GitHub pull request. Zero human intervention required after the initial trigger.
 
+![Python](https://img.shields.io/badge/python-3.10+-blue)
+![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)
+
 ```
 Production alert  ──►  hermes fix  ──►  PR opened  ──►  Human reviews & merges
 ```
@@ -23,6 +26,7 @@ Production alert  ──►  hermes fix  ──►  PR opened  ──►  Human 
 - [Docker](#docker)
 - [Project Structure](#project-structure)
 - [Limitations](#limitations)
+- [License](#license)
 
 ---
 
@@ -58,13 +62,13 @@ If Claude fixes the bug on the first attempt and tests pass, the entire pipeline
 
 ## Prerequisites
 
-| Requirement                               | Notes                                                               |
-| ----------------------------------------- | ------------------------------------------------------------------- |
-| Python 3.10+                              |                                                                     |
-| [Claude Code CLI](https://claude.ai/code) | Must be on `PATH` as `claude`                                       |
-| Git                                       | Must be on `PATH`                                                   |
-| GitHub personal access token              | Needs **Contents: Read & write** and **Pull requests: Read & write** |
-| Anthropic API key                         | Used automatically by the Claude Code CLI                           |
+| Requirement                            | Notes                                                                           |
+| -------------------------------------- | ------------------------------------------------------------------------------- |
+| Python 3.10+                           |                                                                                 |
+| [Claude Code CLI](https://claude.ai/code) | Must be on `PATH` as `claude`                                               |
+| Git                                    | Must be on `PATH`                                                             |
+| GitHub personal access token           | Needs**Contents: Read & write** and **Pull requests: Read & write** |
+| Anthropic API key                      | Used automatically by the Claude Code CLI                                       |
 
 ---
 
@@ -99,6 +103,8 @@ GITHUB_TOKEN="github_pat_..."
 ```
 
 > **Fine-grained PATs** (tokens starting with `github_pat_`) must have **Contents: Read & write** and **Pull requests: Read & write** granted for the target repository under _Repository permissions_.
+
+> `.env` is listed in `.gitignore` — it will never be committed.
 
 ### Runtime settings — `config.yaml`
 
@@ -163,12 +169,12 @@ Output:
 ⏱️  Time saved:
    - Manual fix average: 45 minutes
    - Hermes automated fix: ~4 minutes
-   - **Time saved per incident: 41 minutes (91% reduction)**
+   - Time saved per incident: 41 minutes (91% reduction)
 
 💵 Cost savings (based on $175/hr engineer rate):
    - Manual cost: $131.25
    - Hermes cost: $11.67 (API credits + overhead)
-   - **Net savings per fix: $119.58**
+   - Net savings per fix: $119.58
 
 📊 If you run 10 incidents/month:
    - Monthly savings: ~$1,195
@@ -203,43 +209,34 @@ PR: https://github.com/aromeni/hermes-self-healing-suite/pull/42
 hermes fix [OPTIONS]
 ```
 
-| Option                | Required                           | Default                       | Description                                                                        |
-| --------------------- | ---------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------- |
-| `--error TEXT`        | One of `--error` or `--error-file` | —                             | Raw stack trace string                                                             |
-| `--error-file PATH`   | One of `--error` or `--error-file` | —                             | Path to a Sentry JSON event file                                                   |
-| `--repo URL`          | Yes                                | —                             | Target repository URL (`https://` or `git@`)                                       |
-| `--base-branch TEXT`  | No                                 | `main`                        | Branch to open the PR against                                                      |
-| `--test-command TEXT` | No                                 | `pytest` (from `config.yaml`) | Command used to run the test suite                                                 |
-| `--max-attempts INT`  | No                                 | `3` (from `config.yaml`)      | Maximum fix-retry cycles before giving up                                          |
-| `--dry-run`           | No                                 | off                           | Simulate the fix and print an ROI analysis — does not invoke Claude or create a PR |
+| Option                  | Required                               | Default                           | Description                                                                         |
+| ----------------------- | -------------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------- |
+| `--error TEXT`        | One of `--error` or `--error-file` | —                                | Raw stack trace string                                                              |
+| `--error-file PATH`   | One of `--error` or `--error-file` | —                                | Path to a Sentry JSON event file                                                    |
+| `--repo URL`          | Yes                                    | —                                | Target repository URL (`https://` or `git@`)                                    |
+| `--base-branch TEXT`  | No                                     | `main`                          | Branch to open the PR against                                                       |
+| `--test-command TEXT` | No                                     | `pytest` (from `config.yaml`) | Command used to run the test suite                                                  |
+| `--max-attempts INT`  | No                                     | `3` (from `config.yaml`)      | Maximum fix-retry cycles before giving up                                           |
+| `--dry-run`           | No                                     | off                               | Simulate the fix and print an ROI analysis — does not invoke Claude or create a PR |
 
 **Exit codes:**
 
-| Code | Meaning                                                  |
-| ---- | -------------------------------------------------------- |
-| `0`  | Fix applied and PR opened, or tests were already passing |
-| `1`  | Pipeline failed — see stderr for details                 |
+| Code  | Meaning                                                  |
+| ----- | -------------------------------------------------------- |
+| `0` | Fix applied and PR opened, or tests were already passing |
+| `1` | Pipeline failed — see stderr for details                |
 
 ---
 
 ## Architecture
 
-| Phase | Module            | Responsibility                                           |
-| ----- | ----------------- | -------------------------------------------------------- |
-| 0     | `orchestrator.py` | Parse stack trace, create temp workspace, clone repo     |
+| Phase | Module              | Responsibility                                               |
+| ----- | ------------------- | ------------------------------------------------------------ |
+| 0     | `orchestrator.py` | Parse stack trace, create temp workspace, clone repo         |
 | 1     | `git_ops.py`      | `git blame -p` on offending line, `git log -p` on commit |
-| 2     | `code_agent.py`   | Build structured prompt, invoke `claude -p` subprocess   |
-| 3     | `test_runner.py`  | Run test command, capture stdout/stderr/exit code        |
-| 4     | `pr_builder.py`   | Commit changes, push branch, create PR via PyGithub      |
-
-## Security & Hardening
-
-Hermes is built with enterprise security as a first-class concern:
-
-- **SSRF Protection:** Repository URLs are validated at the CLI entry point against `https://github.com/` to prevent internal network access. Only HTTPS GitHub URLs are accepted.
-- **Secret Leakage Prevention:** `git add -u` stages only tracked files—untracked `.env` files, build artifacts, and secrets are never accidentally committed.
-- **Command Allowlisting:** The test command is restricted to a curated list (`pytest`, `python -m pytest`, `npm test`, `jest`, `go test`, `cargo test`) to prevent arbitrary code execution.
-- **Atomic Rollback:** If PR creation fails, the remote branch is automatically deleted—no orphaned branches left behind.
+| 2     | `code_agent.py`   | Build structured prompt, invoke `claude -p` subprocess     |
+| 3     | `test_runner.py`  | Run test command, capture stdout/stderr/exit code            |
+| 4     | `pr_builder.py`   | Commit changes, push branch, create PR via PyGithub          |
 
 ### Module overview
 
@@ -261,6 +258,15 @@ Uses PyGithub to open a pull request with a structured body that includes the ro
 **`hermes/cli.py`**
 Click-based CLI entry point. Loads `.env` via `python-dotenv` (with directory traversal so it works from any subdirectory), parses Sentry JSON if `--error-file` is provided, and calls `orchestrator.run()`.
 
+## Security & Hardening
+
+Hermes is built with enterprise security as a first-class concern:
+
+- **SSRF Protection:** Repository URLs are validated at the CLI entry point against `https://github.com/` to prevent internal network access. Only HTTPS GitHub URLs are accepted.
+- **Secret Leakage Prevention:** `git add -u` stages only tracked files—untracked `.env` files, build artifacts, and secrets are never accidentally committed.
+- **Command Allowlisting:** The test command is restricted to a curated list (`pytest`, `python -m pytest`, `npm test`, `jest`, `go test`, `cargo test`) to prevent arbitrary code execution.
+- **Atomic Rollback:** If PR creation fails, the remote branch is automatically deleted—no orphaned branches left behind.
+
 ---
 
 ## The SRE Protocol
@@ -280,8 +286,8 @@ The orchestrator parses `HERMES_STATUS` to decide whether to retry, commit, or a
 
 ## Environment Variables
 
-| Variable            | Required     | Description                                      |
-| ------------------- | ------------ | ------------------------------------------------ |
+| Variable              | Required     | Description                                      |
+| --------------------- | ------------ | ------------------------------------------------ |
 | `ANTHROPIC_API_KEY` | Always       | Picked up by the Claude Code CLI subprocess      |
 | `GITHUB_TOKEN`      | Phase 4 only | Used by PyGithub to push branches and create PRs |
 
@@ -359,3 +365,9 @@ hermes-self-healing/
 - **Claude Code CLI must be authenticated.** The subprocess inherits the shell environment (minus `ANTHROPIC_API_KEY`, which is passed through the `.env` → environment path). Run `claude --version` to confirm it is installed and logged in.
 - **One bug per invocation.** Hermes targets the single line identified by `git blame` on the first failing frame. Multi-file cascading failures require separate invocations or human triage.
 - **Max three fix attempts by default.** If Claude cannot produce a passing test suite within `max_fix_attempts` cycles, Hermes exits with code `1` and prints `Human intervention required`.
+
+---
+
+## License
+
+AGPLv3 — see [LICENSE](LICENSE)
